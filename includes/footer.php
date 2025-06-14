@@ -3,7 +3,7 @@
         <div class="container mx-auto px-4">
             <div class="flex flex-col md:flex-row justify-between items-center">
                 <div class="mb-4 md:mb-0">
-                    <p>&copy; <?php echo date('Y'); ?> 图片工具箱. 保留所有权利.</p>
+                    <p>&copy; <?php echo date('Y'); ?> 东港市云港网络科技工作室. 保留所有权利.</p>
                     <div class="flex items-center mt-2 space-x-4 text-sm">
                         <div class="flex items-center">
                             <img src="./static/icp.svg" width="16" class="mr-1">

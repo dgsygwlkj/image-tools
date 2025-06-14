@@ -19,13 +19,6 @@
                             <option value="image/jpeg">JPEG</option>
                             <option value="image/png">PNG</option>
                             <option value="image/webp">WEBP</option>
-                            <option value="image/gif">GIF</option>
-                            <option value="image/bmp">BMP</option>
-                            <option value="image/tiff">TIFF</option>
-                            <option value="image/avif">AVIF</option>
-                            <option value="image/x-icon">ICO</option>
-                            <option value="image/svg+xml">SVG</option>
-                            <option value="image/wmf">WMF</option>
                         </select>
                     </div>
                     
@@ -141,12 +134,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         const mimeType = formatSelect.value;
-        
-        // 创建通知弹窗
-        // 特殊处理矢量格式
-        if (mimeType === 'image/svg+xml' || mimeType === 'image/wmf') {
-            showNotification('注意：SVG和WMF是矢量格式，从位图转换可能会丢失矢量信息。建议使用专业矢量编辑软件进行转换。');
-        }
         
         // 检查浏览器支持
         if (!isFormatSupported(mimeType)) {
