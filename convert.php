@@ -138,6 +138,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 const format = originalFile.type || '未知格式';
                 originalFormat.textContent = `格式: ${format.split('/')[1] || format}`;
                 
+                // 重置转换后预览区域
+                convertedImage.src = '';
+                convertedImage.classList.add('hidden');
+                convertedPlaceholder.classList.remove('hidden');
+                convertedSize.textContent = '';
+                convertedFormat.textContent = '';
+                
+                // 清空转换率显示
+                console.log('准备清空转换率显示');
+                if (conversionInfo) {
+                    conversionInfo.textContent = '';
+                    conversionInfo.className = 'text-sm font-medium mt-2';
+                    console.log('成功清空转换率显示');
+                } else {
+                    console.error('conversionInfo元素未找到');
+                }
+                
+                // 清除转换结果
+                convertedBlob = null;
+                downloadBtn.disabled = true;
+                
                 // 启用转换按钮
                 convertBtn.disabled = false;
             };
@@ -151,8 +172,38 @@ document.addEventListener('DOMContentLoaded', function() {
         return canvas.toDataURL(mimeType).startsWith('data:' + mimeType);
     }
 
+    // 冷却状态变量
+    let isCooling = false;
+    
+    // 冷却函数
+    function startCooldown(duration) {
+        isCooling = true;
+        convertBtn.disabled = true;
+        
+        let remaining = duration;
+        convertBtn.innerHTML = `冷却中 (${remaining}s)`;
+        
+        const timer = setInterval(() => {
+            remaining--;
+            convertBtn.innerHTML = `冷却中 (${remaining}s)`;
+            
+            if (remaining <= 0) {
+                clearInterval(timer);
+                isCooling = false;
+                convertBtn.disabled = false;
+                convertBtn.innerHTML = '转换';
+            }
+        }, 1000);
+    }
+    
     // 转换图片
     convertBtn.addEventListener('click', function() {
+        // 重置转换率显示
+        conversionInfo.textContent = '';
+        conversionInfo.className = 'text-sm font-medium mt-2';
+        
+        if (isCooling) return;
+        
         if (!originalFile) {
             showNotification('请先上传图片', 'error');
             return;
@@ -182,7 +233,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // 显示加载状态
+            // 启动冷却并显示加载状态
+            startCooldown(10);
             convertBtn.disabled = true;
             convertBtn.innerHTML = '转换中...';
             
@@ -193,6 +245,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 添加CSRF令牌
             formData.append('csrf_token', '<?php echo $_SESSION["csrf_token"]; ?>');
+            
+            // 清空转换率显示
+            conversionInfo.textContent = '';
+            conversionInfo.className = 'text-sm font-medium mt-2';
             
             // AJAX请求
             fetch('/api/convert.php', {
@@ -259,11 +315,14 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             })
             .catch(error => {
+                isCooling = false;
                 showNotification('服务器错误: ' + error.message, 'error');
             })
             .finally(() => {
-                convertBtn.disabled = false;
-                convertBtn.innerHTML = '转换';
+                if (!isCooling) {
+                    convertBtn.disabled = false;
+                    convertBtn.innerHTML = '转换';
+                }
             });
             
             return;

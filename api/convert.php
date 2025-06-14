@@ -49,7 +49,7 @@ if (!array_key_exists($targetFormat, $allowedTypes)) {
 }
 
 // 创建临时目录
-$tempDir = __DIR__ . '/../temp/';
+$tempDir = __DIR__ . '/temp/';
 if (!file_exists($tempDir)) {
     mkdir($tempDir, 0755, true);
 }
@@ -129,7 +129,7 @@ try {
     }
 
     // 返回下载链接和文件信息
-    $downloadUrl = '/temp/' . basename($targetFile);
+    $downloadUrl = '/api/temp/' . basename($targetFile);
     $fileSize = filesize($targetFile);
     
     // 记录文件创建时间
