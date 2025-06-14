@@ -1,3 +1,11 @@
+<?php
+session_start();
+
+// 生成CSRF令牌
+if (empty($_SESSION['csrf_token'])) {
+    $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
+}
+?>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>

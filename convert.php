@@ -19,7 +19,19 @@
                             <option value="image/jpeg">JPEG</option>
                             <option value="image/png">PNG</option>
                             <option value="image/webp">WEBP</option>
+                            <option value="image/bmp" class="uncommon-format">BMP</option>
+                            <option value="image/gif" class="uncommon-format">GIF</option>
+                            <option value="image/tiff" class="uncommon-format">TIFF</option>
+                            <option value="image/svg+xml" class="uncommon-format">SVG</option>
+                            <option value="image/x-icon" class="uncommon-format">ICO</option>
                         </select>
+                    </div>
+                    
+                    <div class="mt-4">
+                        <label class="inline-flex items-center">
+                            <input type="checkbox" id="agreeUncommonFormat" class="rounded border-gray-300 text-blue-600 shadow-sm focus:border-blue-300 focus:ring focus:ring-blue-200 focus:ring-opacity-50">
+                            <span class="ml-2 text-gray-700">我同意将非常见格式图片上传到云端进行转换</span>
+                        </label>
                     </div>
                     
                     <div id="qualityControl" class="hidden">
@@ -68,6 +80,19 @@
 document.addEventListener('DOMContentLoaded', function() {
     const imageUpload = document.getElementById('imageUpload');
     const formatSelect = document.getElementById('formatSelect');
+    const agreeUncommonFormat = document.getElementById('agreeUncommonFormat');
+    
+    // 初始化隐藏非常见格式
+    document.querySelectorAll('.uncommon-format').forEach(opt => {
+        opt.style.display = 'none';
+    });
+    
+    // 监听同意复选框变化
+    agreeUncommonFormat.addEventListener('change', function() {
+        document.querySelectorAll('.uncommon-format').forEach(opt => {
+            opt.style.display = this.checked ? '' : 'none';
+        });
+    });
     const qualityControl = document.getElementById('qualityControl');
     const qualityRange = document.getElementById('qualityRange');
     const qualityValue = document.getElementById('qualityValue');
@@ -135,12 +160,116 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const mimeType = formatSelect.value;
         
-        // 检查浏览器支持
-        if (!isFormatSupported(mimeType)) {
-            showNotification(`当前浏览器不支持转换为 ${mimeType} 格式，请尝试使用其他浏览器。`, 'error');
+        // 前端支持的格式
+        const frontendFormats = ['image/jpeg', 'image/png', 'image/webp'];
+        
+        if (frontendFormats.includes(mimeType)) {
+            // 前端转换逻辑
+            if (!isFormatSupported(mimeType)) {
+                showNotification(`当前浏览器不支持转换为 ${mimeType} 格式，请尝试使用其他浏览器。`, 'error');
+                return;
+            }
+        } else {
+            // 服务器端转换逻辑
+            if (!agreeUncommonFormat.checked) {
+                showNotification('请先同意将非常见格式图片上传到云端进行转换', 'error');
+                return;
+            }
+            
+            // 检查SVG/ICO格式尺寸限制
+            if (mimeType === 'image/svg+xml' || mimeType === 'image/x-icon') {
+                showNotification('SVG和ICO格式转换存在尺寸限制，当前图片可能超出限制', 'error');
+                return;
+            }
+            
+            // 显示加载状态
+            convertBtn.disabled = true;
+            convertBtn.innerHTML = '转换中...';
+            
+            // 准备表单数据
+            const formData = new FormData();
+            formData.append('image', originalFile);
+            formData.append('format', mimeType);
+            
+            // 添加CSRF令牌
+            formData.append('csrf_token', '<?php echo $_SESSION["csrf_token"]; ?>');
+            
+            // AJAX请求
+            fetch('/api/convert.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // 清除旧数据
+                    convertedBlob = null;
+                    
+                    // 直接使用服务器返回的URL显示图片
+                    convertedImage.src = data.url;
+                    convertedImage.classList.remove('hidden');
+                    convertedPlaceholder.classList.add('hidden');
+                    
+                    // 使用API返回的文件大小信息
+                    convertedSize.textContent = `文件大小: ${formatFileSize(data.size)}`;
+                    convertedFormat.textContent = `格式: ${data.extension}`;
+                    
+                    // 计算并显示转换率
+                    const ratio = (1 - data.size / originalFile.size) * 100;
+                    conversionInfo.textContent = `转换率: ${ratio.toFixed(1)}% ${ratio > 0 ? '减小' : '增加'}`;
+                    conversionInfo.className = ratio > 0 ? 
+                        'text-sm font-medium mt-2 text-green-600' : 
+                        'text-sm font-medium mt-2 text-red-600';
+                    
+                    // 获取转换后的Blob用于下载
+                    fetch(data.url)
+                        .then(res => res.blob())
+                        .then(blob => {
+                            convertedBlob = blob;
+                            // 启用下载按钮
+                            downloadBtn.disabled = false;
+                            
+                            // 设置5分钟有效期
+                            const expiryTime = new Date().getTime() + 5 * 60 * 1000;
+                            const updateExpiry = () => {
+                                const now = new Date().getTime();
+                                const remaining = Math.max(0, expiryTime - now);
+                                const minutes = Math.floor(remaining / (60 * 1000));
+                                const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+                                
+                                conversionInfo.textContent = `转换率: ${ratio.toFixed(1)}% ${ratio > 0 ? '减小' : '增加'} (有效期: ${minutes}分${seconds}秒)`;
+                                
+                                if (remaining <= 0) {
+                                    clearInterval(timer);
+                                    conversionInfo.textContent = '转换结果已过期';
+                                    conversionInfo.className = 'text-sm font-medium mt-2 text-red-600';
+                                    downloadBtn.disabled = true;
+                                }
+                            };
+                            
+                            updateExpiry();
+                            const timer = setInterval(updateExpiry, 1000);
+                        })
+                        .catch(e => {
+                            console.error('获取文件Blob失败:', e);
+                            downloadBtn.disabled = false;
+                        });
+                } else {
+                    showNotification(data.message || '转换失败', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('服务器错误: ' + error.message, 'error');
+            })
+            .finally(() => {
+                convertBtn.disabled = false;
+                convertBtn.innerHTML = '转换';
+            });
+            
             return;
         }
         
+        // 前端转换逻辑
         const img = new Image();
         img.onload = function() {
             const canvas = document.createElement('canvas');
@@ -223,6 +352,50 @@ document.addEventListener('DOMContentLoaded', function() {
         URL.revokeObjectURL(url);
     });
     
+    // 辅助函数：将DataURL转换为Blob
+    function dataURLtoBlob(dataurl) {
+        if (!dataurl || typeof dataurl !== 'string') {
+            console.error('dataURLtoBlob: Invalid input - expected string');
+            return null;
+        }
+
+        try {
+            const parts = dataurl.split(',');
+            if (parts.length < 2) {
+                console.error('dataURLtoBlob: Invalid DataURL format');
+                return null;
+            }
+
+            const mimeMatch = parts[0].match(/:(.*?);/);
+            if (!mimeMatch || !mimeMatch[1]) {
+                console.error('dataURLtoBlob: Could not extract MIME type');
+                return null;
+            }
+
+            const mimeType = mimeMatch[1];
+            const base64Data = parts[1];
+            
+            // 检查是否是有效的base64数据
+            if (!base64Data || base64Data.trim() === '') {
+                console.error('dataURLtoBlob: Empty base64 data');
+                return null;
+            }
+
+            const binaryString = atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+
+            return new Blob([bytes], {type: mimeType});
+        } catch (e) {
+            console.error('dataURLtoBlob error:', e);
+            showNotification('图片数据处理失败，请重试', 'error');
+            return null;
+        }
+    }
+
     // 辅助函数：格式化文件大小
     function formatFileSize(bytes) {
         if (bytes < 1024) return bytes + ' bytes';
