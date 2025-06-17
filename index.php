@@ -1,4 +1,6 @@
 <?php include 'includes/header.php'; ?>
+<meta name="keywords" content="在线图片处理工具, 图片工具箱, 免费图片工具, 图片压缩转换, 图片编辑工具">
+<meta name="description" content="免费在线图片处理工具箱，提供图片压缩、格式转换、加水印、去背景等多种实用功能，无需注册，完全免费使用。">
 
 <section class="hero bg-gradient-to-r from-blue-800 to-blue-600 text-white py-16">
     <div class="container mx-auto px-4 text-center">
