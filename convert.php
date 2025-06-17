@@ -1,4 +1,9 @@
 <?php include 'includes/header.php'; ?>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
+<script>
+    // 设置PDF.js worker路径
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js';
+</script>
 
 <section class="py-12">
     <div class="container mx-auto px-4">
@@ -24,6 +29,7 @@
                             <option value="image/tiff" class="uncommon-format">TIFF</option>
                             <option value="image/svg+xml" class="uncommon-format">SVG</option>
                             <option value="image/x-icon" class="uncommon-format">ICO</option>
+                            <option value="application/pdf" class="uncommon-format">PDF</option>
                         </select>
                     </div>
                     
@@ -61,10 +67,22 @@
                     </div>
                     
                     <div>
-                        <h3 class="text-lg font-medium text-gray-700 mb-2">转换后图片</h3>
+                        <h3 class="text-lg font-medium text-gray-700 mb-2">转换后结果</h3>
                         <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 flex items-center justify-center min-h-48">
+                            <!-- 图片预览 -->
                             <img id="convertedImage" class="max-w-full max-h-64 hidden" alt="转换后图片">
-                            <p id="convertedPlaceholder" class="text-gray-500">转换后图片将显示在这里</p>
+                            
+                            <!-- PDF预览 -->
+                            <div id="pdfPreviewContainer" class="hidden w-full">
+                                <canvas id="pdfPreviewCanvas" class="max-w-full max-h-64"></canvas>
+                                <div class="flex justify-center mt-2">
+                                    <button id="prevPage" class="px-3 py-1 bg-gray-200 rounded-l">上一页</button>
+                                    <span id="pageNum" class="px-3 py-1 bg-gray-100">1</span>
+                                    <button id="nextPage" class="px-3 py-1 bg-gray-200 rounded-r">下一页</button>
+                                </div>
+                            </div>
+                            
+                            <p id="convertedPlaceholder" class="text-gray-500">转换后结果将显示在这里</p>
                         </div>
                         <p id="convertedSize" class="text-sm text-gray-500 mt-2"></p>
                         <p id="convertedFormat" class="text-sm text-gray-500"></p>
@@ -198,6 +216,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 转换图片
     convertBtn.addEventListener('click', function() {
+        // 重置所有预览状态
+        convertedImage.classList.add('hidden');
+        document.getElementById('pdfPreviewContainer').classList.add('hidden');
+        convertedPlaceholder.classList.remove('hidden');
+        
+        // 重置PDF预览状态
+        pdfDoc = null;
+        pageNum = 1;
+        
         // 重置转换率显示
         conversionInfo.textContent = '';
         conversionInfo.className = 'text-sm font-medium mt-2';
@@ -261,10 +288,20 @@ document.addEventListener('DOMContentLoaded', function() {
                     // 清除旧数据
                     convertedBlob = null;
                     
-                    // 直接使用服务器返回的URL显示图片
-                    convertedImage.src = data.url;
-                    convertedImage.classList.remove('hidden');
-                    convertedPlaceholder.classList.add('hidden');
+                    // 根据格式显示不同的预览
+                    if (data.extension === 'pdf') {
+                        // 显示PDF预览
+                        convertedImage.classList.add('hidden');
+                        document.getElementById('pdfPreviewContainer').classList.remove('hidden');
+                        convertedPlaceholder.classList.add('hidden');
+                        initPDFPreview(data.url);
+                    } else {
+                        // 显示图片预览
+                        document.getElementById('pdfPreviewContainer').classList.add('hidden');
+                        convertedImage.src = data.url;
+                        convertedImage.classList.remove('hidden');
+                        convertedPlaceholder.classList.add('hidden');
+                    }
                     
                     // 使用API返回的文件大小信息
                     convertedSize.textContent = `文件大小: ${formatFileSize(data.size)}`;
@@ -460,6 +497,78 @@ document.addEventListener('DOMContentLoaded', function() {
         if (bytes < 1024) return bytes + ' bytes';
         else if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
         else return (bytes / 1048576).toFixed(1) + ' MB';
+    }
+
+    // PDF预览相关变量
+    let pdfDoc = null,
+        pageNum = 1,
+        pageRendering = false,
+        pageNumPending = null;
+    
+    // 渲染PDF页面
+    function renderPDFPage(num) {
+        pageRendering = true;
+        pdfDoc.getPage(num).then(function(page) {
+            const viewport = page.getViewport({ scale: 1.0 });
+            const canvas = document.getElementById('pdfPreviewCanvas');
+            const context = canvas.getContext('2d');
+            
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            
+            const renderContext = {
+                canvasContext: context,
+                viewport: viewport
+            };
+            
+            const renderTask = page.render(renderContext);
+            
+            renderTask.promise.then(function() {
+                pageRendering = false;
+                if (pageNumPending !== null) {
+                    renderPDFPage(pageNumPending);
+                    pageNumPending = null;
+                }
+            });
+        });
+        
+        document.getElementById('pageNum').textContent = num;
+    }
+    
+    // 上一页
+    function onPrevPage() {
+        if (pageNum <= 1) return;
+        pageNum--;
+        queueRenderPage(pageNum);
+    }
+    
+    // 下一页
+    function onNextPage() {
+        if (pageNum >= pdfDoc.numPages) return;
+        pageNum++;
+        queueRenderPage(pageNum);
+    }
+    
+    // 队列渲染页面
+    function queueRenderPage(num) {
+        if (pageRendering) {
+            pageNumPending = num;
+        } else {
+            renderPDFPage(num);
+        }
+    }
+    
+    // 初始化PDF预览
+    function initPDFPreview(url) {
+        pdfjsLib.getDocument(url).promise.then(function(pdf) {
+            pdfDoc = pdf;
+            document.getElementById('pageNum').textContent = '1 / ' + pdf.numPages;
+            renderPDFPage(1);
+            
+            // 绑定翻页按钮
+            document.getElementById('prevPage').addEventListener('click', onPrevPage);
+            document.getElementById('nextPage').addEventListener('click', onNextPage);
+        });
     }
 });
 </script>

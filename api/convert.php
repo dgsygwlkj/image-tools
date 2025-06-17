@@ -29,7 +29,8 @@ $allowedTypes = [
     'image/x-icon' => 'ico',
     'image/jpeg' => 'jpg',
     'image/png' => 'png',
-    'image/webp' => 'webp'
+    'image/webp' => 'webp',
+    'application/pdf' => 'pdf'
 ];
 
 $fileInfo = finfo_open(FILEINFO_MIME_TYPE);
@@ -72,12 +73,32 @@ if (!move_uploaded_file($_FILES['image']['tmp_name'], $sourceFile)) {
 }
 
 // 执行格式转换
-try {
-    if (!extension_loaded('gd') && !extension_loaded('imagick')) {
-        throw new Exception('服务器未安装GD或ImageMagick扩展');
-    }
-
-    if (extension_loaded('imagick')) {
+    try {
+        // 检查PDF转换
+        if ($targetFormat === 'application/pdf') {
+            // 检查TCPDF库是否可用
+            if (!file_exists(__DIR__ . '/vendor/tecnickcom/tcpdf/tcpdf.php') && !class_exists('TCPDF')) {
+                throw new Exception('服务器未安装TCPDF库，无法进行PDF转换');
+            }
+            
+            // 包含TCPDF库
+            if (!class_exists('TCPDF')) {
+                require_once __DIR__ . '/vendor/tecnickcom/tcpdf/tcpdf.php';
+            }
+            
+            // 创建PDF文档
+            $pdf = new TCPDF();
+            $pdf->AddPage();
+            
+            // 将图片嵌入PDF
+            $pdf->Image($sourceFile, 15, 40, 180, 0, '', '', '', false, 300);
+            
+            // 保存PDF文件
+            $pdf->Output($targetFile, 'F');
+            
+        } elseif (!extension_loaded('gd') && !extension_loaded('imagick')) {
+            throw new Exception('服务器未安装GD或ImageMagick扩展');
+        } elseif (extension_loaded('imagick')) {
         // 使用ImageMagick转换
         $imagick = new Imagick($sourceFile);
         $imagick->setImageFormat($allowedTypes[$targetFormat]);
