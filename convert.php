@@ -1,8 +1,8 @@
 <?php include 'includes/header.php'; ?>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.min.js"></script>
+<script src="./static/pdf.min.js"></script>
 <script>
     // 设置PDF.js worker路径
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.12.313/pdf.worker.min.js';
+    pdfjsLib.GlobalWorkerOptions.workerSrc = './static/pdf.worker.min.js';
 </script>
 
 <section class="py-12">

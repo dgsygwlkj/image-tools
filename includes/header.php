@@ -52,7 +52,7 @@ if (empty($_SESSION['csrf_token'])) {
     <title><?php echo htmlspecialchars($pageSeo['title']); ?></title>
     <meta name="keywords" content="<?php echo htmlspecialchars($pageSeo['keywords']); ?>">
     <meta name="description" content="<?php echo htmlspecialchars($pageSeo['description'] ?? $defaultSeo['description']); ?>">
-    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link href="./static/tailwind.min.css" rel="stylesheet">
     <style>
         .nav-bg {
             background-color: #1e3a8a;
